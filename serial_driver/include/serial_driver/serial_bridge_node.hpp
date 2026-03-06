@@ -30,6 +30,7 @@
 
 #include "msg_converters/converters.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
+#include <std_msgs/msg/int32.hpp>
 
 namespace lc = rclcpp_lifecycle;
 using LNI = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface;
@@ -88,7 +89,7 @@ private:
   void get_params();
 
   // preset message length on both sides of communication for sanity check
-  uint8_t msg_length = 35;
+  uint8_t msg_length = 42;
   bool test_publish;
 
   ackermann_msgs::msg::AckermannDriveStamped ackermann_msg;
@@ -100,6 +101,7 @@ private:
 
   lc::LifecyclePublisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_info_publisher;
   lc::LifecyclePublisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_command_publisher;
+  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr gokart_mode_publisher;
   rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_subscriber;
 };  // class SerialBridgeNode
 

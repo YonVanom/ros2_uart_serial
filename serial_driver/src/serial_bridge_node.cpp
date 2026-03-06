@@ -67,6 +67,10 @@ LNI::CallbackReturn SerialBridgeNode::on_configure(const lc::State & state)
   drive_command_publisher = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(
     "/effective_command_to_nucleo", rclcpp::QoS{100});
 
+  // 0 = remote, 1 = autonomous, 2 = manual
+  gokart_mode_publisher = this->create_publisher<std_msgs::msg::Int32>(
+    "/gokart_mode", rclcpp::QoS{10});
+
   // Reads autonomous ackermann command drive message and publish on serial port to nucleo
   drive_subscriber = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
     "/automous_command_to_nucleo", 10, bind(&SerialBridgeNode::drive_cmd_callback, this, placeholders::_1));
@@ -235,33 +239,34 @@ void SerialBridgeNode::receive_callback(
         drive_ackermann.push_back(tmp);
     }
 
-    ackermann_msg.drive.steering_angle = stof(drive_ackermann[1]);
-    // RCLCPP_INFO(get_logger(), "sterring angle got");
-    RCLCPP_INFO(get_logger(), "steering got %f", ackermann_msg.drive.steering_angle);
+    if(drive_ackermann.size() < 8){
+      RCLCPP_WARN(get_logger(), "Message has correct length but wrong token count, discarding");
+      return;
+    }
+
     try
     {
-      /* code */
+      ackermann_msg.drive.steering_angle = stof(drive_ackermann[1]);
+      RCLCPP_INFO(get_logger(), "steering got %f", ackermann_msg.drive.steering_angle);
       ackermann_msg.drive.speed = stof(drive_ackermann[3]);
       RCLCPP_INFO(get_logger(), "speed got %f", ackermann_msg.drive.speed);
+
+      std_msgs::msg::Int32 mode_msg;
+      mode_msg.data = stoi(drive_ackermann[7]);
+      gokart_mode_publisher->publish(mode_msg);
     }
-    catch(const std::exception& e)
+    catch(const std::invalid_argument& e)
     {
-      std::cerr << e.what() << '\n';
+      RCLCPP_WARN(get_logger(), "Failed to parse message fields, discarding: %s", e.what());
+      return;
     }
-    
-    // RCLCPP_INFO(get_logger()drive_ackermann, "speed got");
 
     if(drive_ackermann[5] == "info"){
       drive_info_publisher->publish(ackermann_msg);
-      // cout << "gokart drive info: " << endl;
     }
     else if (drive_ackermann[5] == "cmmd"){
       drive_command_publisher->publish(ackermann_msg);
-      // cout << "gokart drive command: " << endl;
     }
-
-    // cout << "steer " << ackermann_msg.drive.steering_angle << "radians" 
-    // " speed " << ackermann_msg.drive.speed << "m/s" << endl << endl;
   }
 
   // There is about 20% message corruption rate, in which message length will be different
